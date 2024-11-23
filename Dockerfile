@@ -1,21 +1,26 @@
-# Use an official Node.js runtime as a base image
+# Use the official Node.js image as the base image
 FROM node:16
 
-# Install yt-dlp
-RUN apt-get update && apt-get install -y yt-dlp
-
-# Set the working directory inside the container
+# Set the working directory in the container
 WORKDIR /app
 
-# Copy package.json and install dependencies
-COPY package.json .
+# Copy package.json and package-lock.json
+COPY package*.json ./
+
+# Install dependencies
 RUN npm install
 
-# Copy the rest of the application (all other files)
+# Copy the rest of the application
 COPY . .
 
-# Expose the port the app runs on
+# Install yt-dlp globally
+RUN apt-get update && apt-get install -y wget ffmpeg \
+    && wget -q https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O /usr/local/bin/yt-dlp \
+    && chmod a+rx /usr/local/bin/yt-dlp
+
+# Expose the port your app runs on
 EXPOSE 3000
 
-# Start the application
+# Command to run the application
 CMD ["node", "server.js"]
+
