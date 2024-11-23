@@ -1,55 +1,52 @@
-# Use the official Python 3.9 image as the base image
-FROM python:3.9-slim
+# Use a Node.js base image with the latest LTS version
+FROM node:18
 
-# Set the working directory in the container
+# Set the working directory inside the container
 WORKDIR /app
 
-# Install Node.js, yt-dlp, Puppeteer dependencies, and other required tools
+# Install necessary tools and dependencies for Puppeteer
 RUN apt-get update && apt-get install -y \
     wget \
-    ffmpeg \
     curl \
     gnupg \
-    lsb-release \
-    libnss3 \
-    libatk1.0-0 \
+    ca-certificates \
+    apt-transport-https \
+    chromium \
     libx11-xcb1 \
     libxcomposite1 \
-    libxrandr2 \
+    libxcursor1 \
     libxdamage1 \
-    libxcb-dri3-0 \
-    libgbm-dev \
+    libxrandr2 \
+    libgtk-3-0 \
+    libgbm1 \
+    libnss3 \
     libasound2 \
-    libpangocairo-1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    && rm -rf /var/lib/apt/lists/* \
-    # Install Node.js
-    && curl -fsSL https://deb.nodesource.com/setup_16.x | bash - \
-    && apt-get install -y nodejs
+    fonts-liberation \
+    libappindicator3-1 \
+    xdg-utils \
+    --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install yt-dlp globally
-RUN wget -q https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O /usr/local/bin/yt-dlp \
-    && chmod a+rx /usr/local/bin/yt-dlp
+# Install yt-dlp
+RUN wget -q https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O /usr/local/bin/yt-dlp && \
+    chmod a+rx /usr/local/bin/yt-dlp
 
-# Install Puppeteer and Node.js dependencies
-RUN npm install puppeteer
+# Set environment variables for Puppeteer to use Chromium installed on the system
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
-# Copy package.json and package-lock.json
+# Copy package.json and package-lock.json to the container
 COPY package*.json ./
 
-# Install Node.js dependencies
+# Install project dependencies
 RUN npm install
 
-# Copy the rest of the application
+# Copy the entire application code to the container
 COPY . .
 
-# Copy the cookies file (if manually exporting cookies)
-COPY cookies.txt /app/cookies.txt
-
-# Expose the port your app runs on
+# Expose the port the app will run on
 EXPOSE 3000
 
-# Command to run the application
-CMD ["node", "server.js"]
+# Start the application
+CMD ["npm", "start"]
 
