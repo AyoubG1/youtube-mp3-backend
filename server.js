@@ -11,6 +11,11 @@ app.use(bodyParser.json());
 
 let progressClients = [];
 
+// Handle the root route with a basic message
+app.get('/', (req, res) => {
+  res.send('Welcome to the YouTube MP3 Downloader API!');
+});
+
 // Endpoint to send real-time progress updates
 app.get('/progress', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
@@ -95,5 +100,6 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+
 
 
