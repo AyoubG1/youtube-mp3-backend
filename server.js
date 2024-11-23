@@ -1,4 +1,3 @@
-// Import necessary modules
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -45,13 +44,11 @@ app.post('/download', (req, res) => {
     fs.mkdirSync(path.join(__dirname, 'downloads'));
   }
 
-  // Get the cookies path from environment variables
-  const cookiesPath = process.env.YT_COOKIES_PATH || '/etc/secrets/Cookies'; // Path from environment variable
-
   // Spawn yt-dlp to download and convert the video
   const ytDlp = spawn('yt-dlp', [
     '-x', '--audio-format', 'mp3',
-    '--cookies', cookiesPath,  // Using the environment variable for the cookies file
+    '--cookies-from-browser', 'chrome', // Use cookies from a browser session
+    '--no-cookies', // Prevent cookie saving to file
     '--progress-template', '%(progress._percent_str)s',
     '-o', outputFilePath,
     videoUrl
@@ -75,6 +72,10 @@ app.post('/download', (req, res) => {
 
   ytDlp.on('close', (code) => {
     console.log(`yt-dlp process exited with code ${code}`);
+
+    if (code !== 0) {
+      return res.status(500).json({ error: 'Failed to download the video. Please try again later.' });
+    }
 
     // Trigger file download on completion
     res.download(outputFilePath, 'audio.mp3', (err) => {
