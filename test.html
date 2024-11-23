@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube MP3 Downloader</title>
+  <style>
+    #progress-container {
+      width: 100%;
+      background-color: #f3f3f3;
+      border: 1px solid #ccc;
+      margin-top: 20px;
+      display: none;
+    }
+    #progress-bar {
+      height: 20px;
+      width: 0;
+      background-color: #4caf50;
+    }
+  </style>
+</head>
+<body>
+  <h1>Download YouTube Video as MP3</h1>
+  <form id="download-form">
+    <label for="videoUrl">YouTube Video URL:</label>
+    <input type="text" id="videoUrl" name="videoUrl" required>
+    <button type="submit">Download MP3</button>
+  </form>
+
+  <div id="progress-container">
+    <div id="progress-bar"></div>
+  </div>
+
+  <script>
+    document.getElementById('download-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const videoUrl = document.getElementById('videoUrl').value;
+
+      // Show the progress bar
+      const progressContainer = document.getElementById('progress-container');
+      const progressBar = document.getElementById('progress-bar');
+      progressContainer.style.display = 'block';
+
+      // Start listening for progress updates
+      const eventSource = new EventSource('http://localhost:3000/progress');
+      eventSource.onmessage = (event) => {
+        if (event.data === 'complete') {
+          eventSource.close();
+          alert('Download complete!');
+          progressBar.style.width = '100%';
+        } else {
+          const progress = parseFloat(event.data) || 0;
+          progressBar.style.width = `${progress}%`;
+        }
+      };
+
+      try {
+        // Send POST request to the backend
+        const response = await fetch('http://localhost:3000/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoUrl })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to download MP3.');
+        }
+
+        // Trigger file download in the browser
+        const blob = await response.blob();
+        const downloadUrl = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = 'audio.mp3';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(downloadUrl);
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to download MP3. Please try again.');
+        eventSource.close();
+        progressContainer.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>
+
+
