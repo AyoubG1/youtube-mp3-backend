@@ -38,9 +38,16 @@ async function getCookies() {
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
-      '--no-first-run',
+      '--single-process',
       '--no-zygote',
-      '--single-process', // Helps in limited-resource environments
+      '--disable-background-networking',
+      '--disable-default-apps',
+      '--disable-extensions',
+      '--disable-sync',
+      '--disable-translate',
+      '--metrics-recording-only',
+      '--mute-audio',
+      '--no-first-run',
     ],
     defaultViewport: { width: 800, height: 600 },
   });
@@ -50,7 +57,11 @@ async function getCookies() {
   // Block unnecessary requests to save resources
   await page.setRequestInterception(true);
   page.on('request', (req) => {
-    if (['image', 'stylesheet', 'font', 'media', 'script'].includes(req.resourceType())) {
+    if (
+      ['image', 'stylesheet', 'font', 'media', 'script', 'xhr', 'other'].includes(
+        req.resourceType()
+      )
+    ) {
       req.abort();
     } else {
       req.continue();
@@ -60,7 +71,6 @@ async function getCookies() {
   try {
     await page.goto('https://www.youtube.com', { waitUntil: 'networkidle2', timeout: 90000 });
 
-    // Log in manually or automate if credentials are available
     console.log('Please log in to YouTube in the opened browser window if required.');
 
     // Wait for a short duration to allow login or other page setups
@@ -75,7 +85,7 @@ async function getCookies() {
       cookies
         .map(
           (cookie) =>
-            `${cookie.name}\tTRUE\t/\tTRUE\t0\t${cookie.name}\t${cookie.value}`
+            `${cookie.domain}\tTRUE\t${cookie.path}\t${cookie.secure}\t0\t${cookie.name}\t${cookie.value}`
         )
         .join('\n')
     );
@@ -135,7 +145,18 @@ app.post('/download', async (req, res) => {
   });
 
   ytDlp.stderr.on('data', (data) => {
-    console.error('Error:', data.toString());
+    const errorOutput = data.toString();
+    console.error('yt-dlp Error:', errorOutput);
+
+    if (errorOutput.includes('cookies')) {
+      res.status(400).json({
+        error: 'Invalid or expired cookies. Please try again.',
+      });
+    } else {
+      res.status(500).json({
+        error: 'An error occurred while processing your request.',
+      });
+    }
   });
 
   ytDlp.on('close', (code) => {
@@ -168,9 +189,31 @@ app.post('/download', async (req, res) => {
   });
 });
 
+// Periodic cleanup of the downloads folder
+setInterval(() => {
+  const downloadsPath = path.join(__dirname, 'downloads');
+  fs.readdir(downloadsPath, (err, files) => {
+    if (err) return console.error('Error reading downloads directory:', err);
+
+    files.forEach((file) => {
+      const filePath = path.join(downloadsPath, file);
+      const stats = fs.statSync(filePath);
+      const now = Date.now();
+      const age = now - stats.mtimeMs;
+
+      if (age > 86400000) {
+        fs.unlink(filePath, (err) => {
+          if (err) console.error('Error deleting old file:', err);
+        });
+      }
+    });
+  });
+}, 3600000); // Run every hour
+
 // Start the server
 const PORT = process.env.PORT || 3000;
 
+app.timeout = 120000; // Increase server timeout
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
