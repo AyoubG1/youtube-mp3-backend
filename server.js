@@ -33,27 +33,59 @@ app.get('/progress', (req, res) => {
 async function getCookies() {
   const browser = await puppeteer.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process', // Helps in limited-resource environments
+    ],
+    defaultViewport: { width: 800, height: 600 },
   });
+
   const page = await browser.newPage();
-  await page.goto('https://www.youtube.com', { waitUntil: 'networkidle2' });
 
-  // Log in manually or automate if credentials are available
-  console.log('Please log in to YouTube in the opened browser window if required.');
+  // Block unnecessary requests to save resources
+  await page.setRequestInterception(true);
+  page.on('request', (req) => {
+    if (['image', 'stylesheet', 'font', 'media', 'script'].includes(req.resourceType())) {
+      req.abort();
+    } else {
+      req.continue();
+    }
+  });
 
-  // Wait for a short duration to allow login or other page setups
-  await new Promise((resolve) => setTimeout(resolve, 5000));
+  try {
+    await page.goto('https://www.youtube.com', { waitUntil: 'networkidle2', timeout: 30000 });
 
-  const cookies = await page.cookies();
-  await browser.close();
+    // Log in manually or automate if credentials are available
+    console.log('Please log in to YouTube in the opened browser window if required.');
 
-  const cookiesFilePath = path.join(__dirname, 'cookies.txt');
-  fs.writeFileSync(
-    cookiesFilePath,
-    cookies.map((cookie) => `${cookie.name}\tTRUE\t/\tTRUE\t0\t${cookie.name}\t${cookie.value}`).join('\n')
-  );
+    // Wait for a short duration to allow login or other page setups
+    await new Promise((resolve) => setTimeout(resolve, 5000));
 
-  return cookiesFilePath;
+    const cookies = await page.cookies();
+    await browser.close();
+
+    const cookiesFilePath = path.join(__dirname, 'cookies.txt');
+    fs.writeFileSync(
+      cookiesFilePath,
+      cookies
+        .map(
+          (cookie) =>
+            `${cookie.name}\tTRUE\t/\tTRUE\t0\t${cookie.name}\t${cookie.value}`
+        )
+        .join('\n')
+    );
+
+    return cookiesFilePath;
+  } catch (error) {
+    console.error('Error fetching cookies:', error);
+    await browser.close();
+    throw error;
+  }
 }
 
 // Endpoint to download the video as MP3
@@ -87,7 +119,7 @@ app.post('/download', async (req, res) => {
     '--cookies', cookiesFilePath, // Use cookies file
     '--progress-template', '%(progress._percent_str)s',
     '-o', outputFilePath,
-    videoUrl
+    videoUrl,
   ]);
 
   // Track progress and send updates to clients
