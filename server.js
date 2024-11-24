@@ -58,7 +58,7 @@ async function getCookies() {
   });
 
   try {
-    await page.goto('https://www.youtube.com', { waitUntil: 'networkidle2', timeout: 30000 });
+    await page.goto('https://www.youtube.com', { waitUntil: 'networkidle2', timeout: 90000 });
 
     // Log in manually or automate if credentials are available
     console.log('Please log in to YouTube in the opened browser window if required.');
